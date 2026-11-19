@@ -36,6 +36,10 @@ void aim_monitor_update(aim_monitor_state_t *st, uint32_t now_ms,
     uint8_t ch2_good = is_good(ch2);
     uint8_t ch1_stale, ch2_stale, both_usable;
 
+    /* A channel that is good this cycle has last_good_ms == now_ms, so it can
+     * never also be stale; "usable" therefore reduces to "good". (An explicit
+     * !stale term would be an unreachable branch.) */
+
     if (ch1_good) {
         st->last_good_ms_ch1 = now_ms;
         st->have_ch1_ever = 1u;
@@ -55,7 +59,7 @@ void aim_monitor_update(aim_monitor_state_t *st, uint32_t now_ms,
     out->ch1_stale = ch1_stale;
     out->ch2_stale = ch2_stale;
 
-    both_usable = (uint8_t)(ch1_good && ch2_good && !ch1_stale && !ch2_stale);
+    both_usable = (uint8_t)(ch1_good && ch2_good);
 
     if (both_usable) {
         int32_t diff = abs_diff_i32(ch1->altitude_ft, ch2->altitude_ft);
@@ -90,10 +94,10 @@ void aim_monitor_update(aim_monitor_state_t *st, uint32_t now_ms,
 
     out->miscompare = st->miscompare_latched;
 
-    if (ch1_good && !ch1_stale) {
+    if (ch1_good) {
         out->altitude_available = 1u;
         out->reconciled_altitude_ft = ch1->altitude_ft;
-    } else if (ch2_good && !ch2_stale) {
+    } else if (ch2_good) {
         out->altitude_available = 1u;
         out->reconciled_altitude_ft = ch2->altitude_ft;
     } else {

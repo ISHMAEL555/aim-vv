@@ -1,9 +1,11 @@
 #include "decoder.h"
 
+/* UINT32_C, not a bare 1u: on 8-bit AVR, unsigned int is 16 bits and
+ * 1u << 17 overflows. Caught by the Phase 7 target build. */
 #define AIM_LABEL_203     0x83u
 #define AIM_ALT_FIELD_BITS 18u
-#define AIM_ALT_SIGN_BIT   (1u << (AIM_ALT_FIELD_BITS - 1u))   /* bit 17 of the field */
-#define AIM_ALT_FIELD_MASK ((1u << AIM_ALT_FIELD_BITS) - 1u)   /* 18 ones */
+#define AIM_ALT_SIGN_BIT   (UINT32_C(1) << (AIM_ALT_FIELD_BITS - 1u))   /* bit 17 of the field */
+#define AIM_ALT_FIELD_MASK ((UINT32_C(1) << AIM_ALT_FIELD_BITS) - 1u)   /* 18 ones */
 
 static uint32_t count_ones(uint32_t v)
 {

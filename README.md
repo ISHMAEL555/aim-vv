@@ -54,6 +54,10 @@ tests/
   vectors/                  Shared JSON test vectors (decoder worked examples)
   unit/                     pytest + ctypes unit tests, one file per module, tagged by HLR ID
   integration/              Scenario tests through the public API, tagged by SYS ID
+  model/                    Independent Python reference model (Phase 10 substitute)
+target/aim_target/          Arduino UNO firmware (.ino) + UART frame parser (framer.c)
+scripts/                    check.sh (coverage/static analysis), trace.py, mutate.py,
+                            build_target.sh (AVR build), pil.py (processor-in-the-loop)
 CMakeLists.txt               Builds libaim as a shared library for ctypes
 ```
 
@@ -65,13 +69,13 @@ CMakeLists.txt               Builds libaim as a shared library for ctypes
 | 1 — C core | done |
 | 2 — Unit tests | done |
 | 3 — Integration tests | done |
-| 4 — Coverage, static analysis, CI | not started |
-| 5 — Traceability | not started |
-| 6 — Seeded defects | not started |
-| 7 — Processor-in-the-loop | not started |
-| 8 — Process documents | not started |
-| 9 — Change control | not started |
-| 10 — Stateflow model | not started |
+| 4 — Coverage, static analysis, CI | done (100 % line/branch, `scripts/check.sh`, CI) |
+| 5 — Traceability | done (`scripts/trace.py`, [matrix](docs/trace/TRACEABILITY.md)) |
+| 6 — Seeded defects | done (39/39 killed, [report](docs/verification/SEEDED_DEFECTS.md)) |
+| 7 — Processor-in-the-loop | firmware + harness done and compiling for UNO; **hardware run pending** (none attached) |
+| 8 — Process documents | done ([plan](docs/process/PLAN.md), [FTA](docs/safety/FTA.md), [summary](docs/process/VERIFICATION_SUMMARY.md)) |
+| 9 — Change control | done ([log](docs/process/CHANGE_LOG.md)) |
+| 10 — Stateflow model | Python reference model back-to-back instead (no MATLAB available) |
 
 ## Build & test
 
@@ -86,3 +90,15 @@ python3 -m venv .venv && .venv/bin/pip install pytest
 The library builds with `-Wall -Wextra -Werror`, no dynamic memory, fixed-width
 types only, and takes time as an explicit `now_ms` parameter rather than reading
 a clock — see `docs/icd/ICD.md` for why.
+
+## Full verification
+
+```bash
+scripts/check.sh                 # strict build, analyzer, tests, 100% coverage gate
+.venv/bin/python scripts/trace.py --check
+.venv/bin/python scripts/mutate.py
+scripts/build_target.sh          # needs arduino-cli + arduino:avr core
+.venv/bin/python scripts/pil.py --sim                                  # no hardware
+.venv/bin/pip install pyserial
+.venv/bin/python scripts/pil.py --port /dev/ttyACM0 --adc2 /dev/ttyUSB0 --report   # real rig
+```

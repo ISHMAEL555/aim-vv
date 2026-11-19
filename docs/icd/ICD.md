@@ -64,7 +64,8 @@ Two independent serial links carry frames of the same shape:
 
 ```
 Byte 0   SYNC       0xAA
-Byte 1   TYPE        0x01 = ADC1_WORD, 0x02 = SELECTED_ALT, 0x03 = ADC2_WORD
+Byte 1   TYPE        0x01 = ADC1_WORD, 0x02 = SELECTED_ALT, 0x03 = ADC2_WORD,
+                     0x04 = STEP, 0x05 = APPROACH_MODE
 Bytes 2-5 PAYLOAD    4 bytes, little-endian
 Byte 6   CHECKSUM     8-bit two's-complement sum: (TYPE + PAYLOAD bytes + CHECKSUM) mod 256 == 0
 ```
@@ -73,8 +74,27 @@ Byte 6   CHECKSUM     8-bit two's-complement sum: (TYPE + PAYLOAD bytes + CHECKS
   `uint32_t` ARINC word from §2) and `SELECTED_ALT` (payload = `int32_t`
   selected altitude in ft; the reserved value `0x7FFFFFFF` means "no target /
   invalid").
+  The main link also carries `APPROACH_MODE` (payload 0 or 1; `aim_step`'s
+  `approach_mode` input, held until changed) and `STEP` (payload = `now_ms`;
+  see below).
 - **Secondary link** (CP2102 → UNO `SoftwareSerial` pin 10, 38400 baud): only
   `ADC2_WORD` frames, same payload shape as `ADC1_WORD`.
+
+**Execution model (added in CR-003).** The firmware latches the most recent
+`ADC1_WORD`, `ADC2_WORD`, `SELECTED_ALT` and `APPROACH_MODE` values and calls
+`aim_step` exactly once per `STEP` frame, using the frame's payload as `now_ms`.
+Time is therefore supplied by the test laptop, not read from `millis()`, which
+keeps processor-in-the-loop runs deterministic and comparable cycle-by-cycle
+with the host build (HLR-TIM-01). After each step the firmware prints one line:
+
+```
+S,now_ms,state,approaching,deviation,miscompare,alt_valid,altitude_ft,ch1_valid,ch2_valid,ch1_stale,ch2_stale,sel_valid,rejected
+```
+
+Frames failing sync/checksum or with an unknown TYPE are dropped and counted in
+`rejected` (HLR-FRM-01..04). The harness must allow ~15 ms between an `ADC2_WORD`
+frame and the following `STEP`, because the two links are independent and
+`SoftwareSerial` reception at 38400 baud is asynchronous to the USB link.
 
 Frame parsing is implemented in the Phase 7 target firmware (`target/`), not in
 `src/`. The core API in §4 takes already-decoded values, independent of how

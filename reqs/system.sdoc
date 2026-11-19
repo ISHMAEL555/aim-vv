@@ -77,3 +77,13 @@ The system shall perform all alerting and monitoring functions deterministically
 as a function of a monotonic time input (now_ms), independent of wall-clock
 time or call rate.
 <<<
+
+[REQUIREMENT]
+UID: SYS-10
+TITLE: Robust target-link framing
+STATEMENT: >>>
+The target firmware shall accept channel words, the selected altitude, the
+approach-mode flag and step commands only from frames that pass sync and
+checksum validation, and shall recover frame alignment after corrupted or
+truncated bytes without losing a subsequent valid frame.
+<<<

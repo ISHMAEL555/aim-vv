@@ -195,3 +195,34 @@ def test_malformed_word_on_one_channel_is_rejected_system_wide(lib):
     assert out.monitor.ch1_valid == 0
     assert out.monitor.altitude_available == 1
     assert out.altitude_ft == SELECTED  # only the good channel (ch2) is used
+
+
+def test_no_channels_means_altitude_invalid_and_no_alerts(lib):
+    """SYS-3, SYS-5: with neither channel carrying good data the reconciled
+    altitude is reported invalid and alerting stays in CRUISE."""
+    aim = new_aim(lib)
+    out = tick(lib, aim, 0, ncd_word(SELECTED), bad_label_word(SELECTED), SELECTED)
+    assert out.altitude_valid == 0
+    assert out.monitor.altitude_available == 0
+    assert out.alerter.state == ac.AIM_ALERT_CRUISE
+    assert out.alerter.alert_approaching == 0
+    assert out.alerter.alert_deviation == 0
+
+
+def test_corrupted_link_does_not_disturb_valid_data_path(framer_lib):
+    """SYS-10: a byte stream with garbage, a corrupted frame and a truncated
+    frame interleaved with good frames yields exactly the good frames, in order."""
+    fr = ac.Framer()
+    framer_lib.aim_framer_init(ctypes.byref(fr))
+    good = [ac.make_frame(ac.FRAME_ADC1_WORD, good_word(10000)),
+            ac.make_frame(ac.FRAME_SELECTED_ALT, 10000),
+            ac.make_frame(ac.FRAME_STEP, 100)]
+    bad = bytearray(ac.make_frame(ac.FRAME_ADC2_WORD, good_word(10000)))
+    bad[4] ^= 0xFF
+    stream = b"\x01\x02" + good[0] + bytes(bad) + good[1] + good[2][:3] + good[2]
+    got = []
+    for b in stream:
+        out = ac.Frame()
+        if framer_lib.aim_framer_push(ctypes.byref(fr), b, ctypes.byref(out)):
+            got.append((out.type, out.payload))
+    assert got == [(1, good_word(10000)), (2, 10000), (4, 100)]

@@ -5,6 +5,7 @@ retype a field here without making the matching change in aim_types.h --
 these are two independent encodings of the same C ABI.
 """
 import ctypes
+import os
 import pathlib
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -99,6 +100,9 @@ class Status(ctypes.Structure):
 
 
 def find_lib() -> pathlib.Path:
+    override = os.environ.get("AIM_LIB")
+    if override:
+        return pathlib.Path(override)
     for candidate in _LIB_CANDIDATES:
         if candidate.exists():
             return candidate
@@ -167,3 +171,34 @@ def encode_word(label: int, sdi: int, ssm: int, alt_ft: int) -> int:
     parity = 0 if ones % 2 == 1 else 1
     word |= (parity & 1) << 31
     return word
+
+
+# ---- Phase 7 frame parser (target/aim_target/framer.c) --------------------
+FRAME_ADC1_WORD, FRAME_SELECTED_ALT, FRAME_ADC2_WORD, FRAME_STEP, FRAME_APPROACH_MODE = 1, 2, 3, 4, 5
+NO_TARGET = 0x7FFFFFFF
+
+
+class Framer(ctypes.Structure):
+    _fields_ = [("buf", ctypes.c_uint8 * 7), ("n", ctypes.c_uint8), ("rejected", ctypes.c_uint16)]
+
+
+class Frame(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_uint8), ("payload", ctypes.c_uint32)]
+
+
+def make_frame(ftype: int, payload: int) -> bytes:
+    """Python reference frame encoder (ICD Section 3)."""
+    p = (payload & 0xFFFFFFFF).to_bytes(4, "little")
+    chk = (-(ftype + sum(p))) & 0xFF
+    return bytes([0xAA, ftype]) + p + bytes([chk])
+
+
+def load_framer() -> ctypes.CDLL:
+    override = os.environ.get("AIM_FRAMER_LIB")
+    path = pathlib.Path(override) if override else REPO_ROOT / "build" / "libaimframer.so"
+    lib = ctypes.CDLL(str(path))
+    lib.aim_framer_init.argtypes = [ctypes.POINTER(Framer)]
+    lib.aim_framer_init.restype = None
+    lib.aim_framer_push.argtypes = [ctypes.POINTER(Framer), ctypes.c_uint8, ctypes.POINTER(Frame)]
+    lib.aim_framer_push.restype = ctypes.c_uint8
+    return lib
