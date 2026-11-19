@@ -14,7 +14,7 @@ bound to that baseline plus those changes, not to a single commit).
 | Independent model | 150 random seeds × 400 cycles identical to the C code, incl. 32-bit time wrap | `tests/integration/test_back_to_back.py` |
 | AVR build | compiles clean for UNO: 5.7 KB flash (17 %), 371 B RAM (18 %) | `scripts/build_target.sh` |
 | PIL, simulated target | 4/4 scenarios match host lockstep ([report](../verification/PIL_RESULTS.md)) | `scripts/pil.py --sim` |
-| **PIL, real hardware** | **NOT RUN** — no Arduino was attached | `scripts/pil.py --port … --adc2 …` |
+| **PIL, real hardware** | **NOT RUN** — no Arduino was attached | `scripts/pil.py --port /dev/ttyACM0 --adc2 <ADC-2 serial device> --report` (see README, Rig) |
 
 ## Findings during verification
 1. **CR-002 — real defect.** 16-bit `int` shift overflow in the decoder, invisible on the host,
@@ -43,3 +43,10 @@ bound to that baseline plus those changes, not to a single commit).
 - Mutation operators are hand-picked (39), not exhaustive.
 - Single engineer: no independent review. Tooling stands in for independence.
 - cppcheck/clang-tidy unavailable; static analysis is gcc-only.
+
+## Closing Phase 7
+After a passing hardware run with `--report`, `docs/verification/PIL_RESULTS.md` will state
+"hardware" as its run mode. Only then: change the "NOT RUN" row above to the result, update
+the Phase 7 row in `README.md`, and log any firmware/harness fixes in `CHANGE_LOG.md`.
+Flash command: `arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:uno target/aim_target`
+(after `arduino-cli compile --fqbn arduino:avr:uno target/aim_target`).

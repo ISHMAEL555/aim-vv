@@ -25,14 +25,29 @@ hazard analysis that drives the safety requirements.
 
 ## Rig
 
-- **Test station:** laptop.
-- **Device under test:** Arduino UNO.
-- **Secondary serial link:** CP2102 USB-UART bridge (feeds ADC-2 to the UNO over
-  `SoftwareSerial` on pin 10 at 38400 baud, independent of the main USB link at
-  115200 baud used for ADC-1 and the selected altitude).
+- **Device under test:** Arduino UNO, USB-connected (`/dev/ttyACM0`), 115200 baud:
+  carries ADC-1, the selected altitude, approach mode and step commands.
+- **Test station:** a laptop **or a Raspberry Pi 4**. It runs `scripts/pil.py`.
+- **Secondary link (ADC-2):** 38400 baud into UNO pin 10 (`SoftwareSerial`), independent of
+  the USB link. Any one of these works as the source:
+
+| Source | Connection | `--adc2` argument |
+|---|---|---|
+| Pi 4 hardware UART | Pi pin 8 (GPIO14 TXD) to UNO pin 10; Pi pin 6 (GND) to UNO GND | `/dev/serial0` |
+| USB-serial adapter (CP2102, FT232, CH340) | adapter TXD to UNO pin 10; GND to GND | `/dev/ttyUSB0` |
+| Arduino Nano as adapter (empty sketch uploaded) | Nano RX0 to UNO pin 10; GND to GND | `/dev/ttyUSB0` |
+
+Do not connect the UNO's TX or any 5 V pin to a 3.3 V device (Pi, CP2102). Nothing here needs
+an analog-to-digital converter: ADC-1/ADC-2 are *air data computers*, simulated in software
+by the test station.
+
+**Raspberry Pi 4 one-time setup:** `sudo raspi-config` > Interface Options > Serial Port:
+login shell **No**, serial hardware **Yes**; add `dtoverlay=disable-bt` to
+`/boot/firmware/config.txt`; reboot. `/dev/serial0` should then exist.
+**WSL2 laptops** need `usbipd-win` to attach USB devices.
 
 The core logic in `src/` has no hardware dependency and builds/tests entirely on
-the laptop; the Arduino only matters from Phase 7 onward (processor-in-the-loop).
+the laptop; the Arduino only matters for Phase 7 (processor-in-the-loop) (processor-in-the-loop).
 
 ## Repository layout
 
@@ -100,5 +115,5 @@ scripts/check.sh                 # strict build, analyzer, tests, 100% coverage 
 scripts/build_target.sh          # needs arduino-cli + arduino:avr core
 .venv/bin/python scripts/pil.py --sim                                  # no hardware
 .venv/bin/pip install pyserial
-.venv/bin/python scripts/pil.py --port /dev/ttyACM0 --adc2 /dev/ttyUSB0 --report   # real rig
+.venv/bin/python scripts/pil.py --port /dev/ttyACM0 --adc2 /dev/serial0 --report   # real rig (see Rig table for --adc2)
 ```
