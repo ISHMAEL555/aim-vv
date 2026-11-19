@@ -1,0 +1,79 @@
+[DOCUMENT]
+TITLE: AIM System Requirements
+
+[REQUIREMENT]
+UID: SYS-1
+TITLE: Dual-channel ARINC 429 decode
+STATEMENT: >>>
+The system shall decode ARINC 429 label 203 altitude words from two
+independent air data channels (ADC-1, ADC-2).
+<<<
+
+[REQUIREMENT]
+UID: SYS-2
+TITLE: Reject malformed words
+STATEMENT: >>>
+The system shall reject (mark invalid) any altitude word with an incorrect
+label or a failed parity check.
+<<<
+
+[REQUIREMENT]
+UID: SYS-3
+TITLE: SSM discrimination
+STATEMENT: >>>
+The system shall discriminate SSM status (Normal Operation, No Computed Data,
+Functional Test, Failure Warning) and shall use only Normal Operation data for
+altitude alerting and cross-side comparison.
+<<<
+
+[REQUIREMENT]
+UID: SYS-4
+TITLE: Cross-side miscompare detection
+STATEMENT: >>>
+The system shall detect and latch a cross-side miscompare between ADC-1 and
+ADC-2 per safety requirement SR-1 (see docs/safety/FHA.md).
+<<<
+
+[REQUIREMENT]
+UID: SYS-5
+TITLE: Stale channel detection and fail-over
+STATEMENT: >>>
+The system shall detect a stale channel per safety requirement SR-2 and shall
+automatically use the remaining valid channel per SR-4 (see
+docs/safety/FHA.md).
+<<<
+
+[REQUIREMENT]
+UID: SYS-6
+TITLE: Approaching-altitude indication
+STATEMENT: >>>
+The system shall provide an approaching-altitude indication when the aircraft
+altitude is within the approach band of the selected altitude and not yet
+captured.
+<<<
+
+[REQUIREMENT]
+UID: SYS-7
+TITLE: Deviation alert
+STATEMENT: >>>
+The system shall provide a deviation alert when a captured altitude departs
+the deviation band for longer than the deviation persistence time per SR-3,
+unless approach mode is active.
+<<<
+
+[REQUIREMENT]
+UID: SYS-8
+TITLE: Selected altitude validation
+STATEMENT: >>>
+The system shall accept and validate a pilot-selected target altitude, holding
+the last valid value when an invalid selected altitude is received.
+<<<
+
+[REQUIREMENT]
+UID: SYS-9
+TITLE: Deterministic, time-explicit operation
+STATEMENT: >>>
+The system shall perform all alerting and monitoring functions deterministically
+as a function of a monotonic time input (now_ms), independent of wall-clock
+time or call rate.
+<<<

@@ -1,0 +1,10 @@
+build/
+.venv/
+*.o
+*.so
+*.dylib
+*.dll
+__pycache__/
+*.pyc
+.pytest_cache/
+.cache/

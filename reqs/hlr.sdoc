@@ -1,0 +1,282 @@
+[DOCUMENT]
+TITLE: AIM High-Level Requirements
+
+[REQUIREMENT]
+UID: HLR-DEC-01
+TITLE: Label extraction and check
+STATEMENT: >>>
+aim_decoder_decode shall extract the 8-bit label from bits 0-7 of the input
+word and shall set valid=false whenever the label does not equal 0203 octal
+(0x83).
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-1
+
+[REQUIREMENT]
+UID: HLR-DEC-02
+TITLE: SDI extraction
+STATEMENT: >>>
+aim_decoder_decode shall extract SDI from bits 8-9 of the input word.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-1
+
+[REQUIREMENT]
+UID: HLR-DEC-03
+TITLE: Altitude field extraction
+STATEMENT: >>>
+aim_decoder_decode shall extract the 18-bit two's-complement BNR altitude
+field from bits 10-27, sign-extend it to int32_t, with LSB = 1 ft.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-1
+
+[REQUIREMENT]
+UID: HLR-DEC-04
+TITLE: SSM mapping
+STATEMENT: >>>
+aim_decoder_decode shall extract SSM from bits 28-29 and map it to
+AIM_SSM_FAILURE_WARNING / AIM_SSM_NO_COMPUTED_DATA / AIM_SSM_FUNCTIONAL_TEST /
+AIM_SSM_NORMAL_OPERATION per the standard ARINC 429 BNR SSM encoding
+(00/01/10/11).
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-3
+
+[REQUIREMENT]
+UID: HLR-DEC-05
+TITLE: Parity check
+STATEMENT: >>>
+aim_decoder_decode shall compute odd parity over bits 0-30 and compare it to
+bit 31; parity_ok shall be false on mismatch, and valid shall be false
+whenever parity_ok is false.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-2
+
+[REQUIREMENT]
+UID: HLR-DEC-06
+TITLE: Validity independent of SSM
+STATEMENT: >>>
+aim_decoder_decode shall set valid=true only when the label is correct and
+parity_ok is true, regardless of SSM value; SSM is reported separately for
+use by the alerter and monitor.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-2
+
+[REQUIREMENT]
+UID: HLR-ALT-01
+TITLE: Selected altitude hold and range check
+STATEMENT: >>>
+aim_alerter_update shall hold the last-valid selected altitude across calls
+and shall reject (not adopt) a new selected altitude outside
+[AIM_MIN_ALT_FT, AIM_MAX_ALT_FT].
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-8
+
+[REQUIREMENT]
+UID: HLR-ALT-02
+TITLE: No alert before a valid target exists
+STATEMENT: >>>
+Before any valid selected altitude has ever been received,
+selected_altitude_valid shall be false and no alert shall be asserted.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-8
+
+[REQUIREMENT]
+UID: HLR-ALT-03
+TITLE: Invalid altitude forces CRUISE
+STATEMENT: >>>
+When the current altitude is invalid, the alerter shall force state to
+CRUISE and shall clear deviation_since_ms and both alert flags.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-6
+
+[REQUIREMENT]
+UID: HLR-ALT-04
+TITLE: CRUISE to APPROACHING
+STATEMENT: >>>
+From CRUISE, the alerter shall transition to APPROACHING when
+|altitude - selected| <= AIM_APPROACH_BAND_FT.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-6
+
+[REQUIREMENT]
+UID: HLR-ALT-05
+TITLE: APPROACHING transitions
+STATEMENT: >>>
+From APPROACHING, the alerter shall transition to CAPTURED when
+|altitude - selected| <= AIM_CAPTURE_BAND_FT, and shall transition back to
+CRUISE when |altitude - selected| > AIM_APPROACH_BAND_FT + AIM_HYSTERESIS_FT.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-6
+
+[REQUIREMENT]
+UID: HLR-ALT-06
+TITLE: CAPTURED to DEVIATION
+STATEMENT: >>>
+From CAPTURED, when |altitude - selected| > AIM_DEVIATION_BAND_FT
+continuously for >= AIM_DEVIATION_PERSIST_MS and approach_mode is false, the
+alerter shall transition to DEVIATION.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-7
+
+[REQUIREMENT]
+UID: HLR-ALT-07
+TITLE: Deviation timer reset
+STATEMENT: >>>
+From CAPTURED, the deviation timer (deviation_since_ms) shall reset to zero
+whenever |altitude - selected| <= AIM_DEVIATION_BAND_FT.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-7
+
+[REQUIREMENT]
+UID: HLR-ALT-08
+TITLE: DEVIATION to CAPTURED
+STATEMENT: >>>
+From DEVIATION, the alerter shall transition back to CAPTURED when
+|altitude - selected| <= AIM_DEVIATION_BAND_FT - AIM_HYSTERESIS_FT.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-7
+
+[REQUIREMENT]
+UID: HLR-ALT-09
+TITLE: Approach mode inhibits deviation
+STATEMENT: >>>
+While approach_mode is true, the alerter shall never report state DEVIATION
+or alert_deviation=true. If already in DEVIATION when approach_mode becomes
+true, it shall revert immediately to CAPTURED and restart the deviation
+timer from the current call's now_ms.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-7
+
+[REQUIREMENT]
+UID: HLR-ALT-10
+TITLE: Alert flags follow state exactly
+STATEMENT: >>>
+alert_approaching shall be true if and only if state == APPROACHING;
+alert_deviation shall be true if and only if state == DEVIATION.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-6
+
+[REQUIREMENT]
+UID: HLR-MON-01
+TITLE: Good-sample criterion
+STATEMENT: >>>
+aim_monitor_update shall consider a channel "good" for a given call only when
+its decoded word is valid and its SSM is NORMAL_OPERATION.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-3
+
+[REQUIREMENT]
+UID: HLR-MON-02
+TITLE: Staleness detection
+STATEMENT: >>>
+aim_monitor_update shall record the time of the most recent good sample per
+channel and shall set that channel's stale flag when more than
+AIM_CHANNEL_STALE_MS has elapsed since the last good sample. A channel that
+has never produced a good sample shall be reported invalid, not stale.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-5
+
+[REQUIREMENT]
+UID: HLR-MON-03
+TITLE: Miscompare latch
+STATEMENT: >>>
+When both channels are good and not stale, aim_monitor_update shall compute
+|ch1.altitude_ft - ch2.altitude_ft| and shall latch a miscompare when that
+difference exceeds AIM_MISCOMPARE_THRESHOLD_FT continuously for
+>= AIM_MISCOMPARE_PERSIST_MS.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-4
+
+[REQUIREMENT]
+UID: HLR-MON-04
+TITLE: Miscompare clear
+STATEMENT: >>>
+Once latched, the miscompare flag shall clear only when the difference stays
+<= AIM_MISCOMPARE_THRESHOLD_FT continuously for >= AIM_MISCOMPARE_PERSIST_MS.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-4
+
+[REQUIREMENT]
+UID: HLR-MON-05
+TITLE: Frozen timers when a channel is unusable
+STATEMENT: >>>
+When either channel is not usable (invalid or stale), the divergence and
+convergence timers shall be frozen: neither advanced nor reset.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-4
+
+[REQUIREMENT]
+UID: HLR-MON-06
+TITLE: Altitude reconciliation and fail-over
+STATEMENT: >>>
+aim_monitor_update shall output a reconciled altitude from ch1 (primary) when
+usable, else from ch2 when usable, else shall report altitude_available=false.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-5
+
+[REQUIREMENT]
+UID: HLR-TIM-01
+TITLE: Time is caller-supplied
+STATEMENT: >>>
+All persistence and staleness computations shall be based solely on the
+caller-supplied now_ms parameter (elapsed-time arithmetic using unsigned
+32-bit wraparound-safe subtraction), and shall not depend on wall-clock time
+or any internal call counter.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-9
+
+[REQUIREMENT]
+UID: HLR-TIM-02
+TITLE: No hidden I/O or allocation
+STATEMENT: >>>
+The core library shall perform no blocking calls, dynamic memory allocation,
+or hardware I/O; aim_step shall be callable at any rate and shall produce a
+result based only on its inputs and prior state.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-9
