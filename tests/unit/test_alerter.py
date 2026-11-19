@@ -196,3 +196,52 @@ def test_alert_flags_match_state_exactly(lib, st):
     out = step(lib, st, 100, 10000 - APPROACH, True, 10000, True)
     assert out.state == ac.AIM_ALERT_APPROACHING
     assert out.alert_approaching == 1 and out.alert_deviation == 0
+
+
+@pytest.mark.parametrize("selected,accepted", [
+    (-1000, True), (-1001, False), (50000, True), (50001, False),
+])
+def test_selected_altitude_range_boundaries(lib, st, selected, accepted):
+    """HLR-ALT-01: inclusive range [-1000, 50000]."""
+    out = step(lib, st, 0, 0, True, selected, True)
+    assert out.selected_altitude_valid == int(accepted)
+
+
+def test_corrupted_state_recovers_to_cruise(lib, st):
+    """Defensive default branch: an out-of-range state byte (e.g. RAM upset)
+    must fall back to CRUISE rather than stay undefined."""
+    reach_captured(lib, st, 10000)
+    st.state = 99
+    out = step(lib, st, 10, 10000, True, 10000, True)
+    assert out.state == ac.AIM_ALERT_CRUISE
+
+
+def test_deviation_band_exact_boundary(lib, st):
+    """HLR-ALT-06: an error of exactly DEVIATION_BAND is not a deviation;
+    DEVIATION_BAND+1 is."""
+    reach_captured(lib, st, 10000)
+    step(lib, st, 100, 10000 + DEVIATION_BAND, True, 10000, True)
+    assert st.deviating == 0
+    out = step(lib, st, 100 + PERSIST_MS, 10000 + DEVIATION_BAND, True, 10000, True)
+    assert out.state == ac.AIM_ALERT_CAPTURED
+
+    step(lib, st, 5000, 10000 + DEVIATION_BAND + 1, True, 10000, True)
+    assert st.deviating == 1
+
+
+def test_alert_flags_exclusive_to_their_state(lib, st):
+    """HLR-ALT-10: alert_approaching only in APPROACHING, alert_deviation only
+    in DEVIATION; neither is set in CRUISE or CAPTURED, and approaching is
+    clear in DEVIATION."""
+    out = step(lib, st, 0, 0, True, 10000, True)            # CRUISE
+    assert (out.alert_approaching, out.alert_deviation) == (0, 0)
+
+    out = step(lib, st, 1, 9500, True, 10000, True)         # APPROACHING
+    assert (out.state, out.alert_approaching, out.alert_deviation) == (ac.AIM_ALERT_APPROACHING, 1, 0)
+
+    out = step(lib, st, 2, 10000, True, 10000, True)        # CAPTURED
+    assert (out.state, out.alert_approaching, out.alert_deviation) == (ac.AIM_ALERT_CAPTURED, 0, 0)
+
+    step(lib, st, 100, 10000 + DEVIATION_BAND + 1, True, 10000, True)
+    out = step(lib, st, 100 + PERSIST_MS, 10000 + DEVIATION_BAND + 1, True, 10000, True)
+    assert (out.state, out.alert_approaching, out.alert_deviation) == (ac.AIM_ALERT_DEVIATION, 0, 1)

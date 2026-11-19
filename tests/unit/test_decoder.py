@@ -69,3 +69,15 @@ def test_every_label_other_than_203_is_invalid(lib):
         word = aim_ctypes.encode_word(bad_label, 1, 3, 10000)
         out = aim_ctypes.decode(lib, word)
         assert bool(out.valid) is False, hex(bad_label)
+
+
+@pytest.mark.parametrize("sdi", [0, 1, 2, 3])
+def test_sdi_extracted_and_does_not_disturb_other_fields(lib, sdi):
+    """HLR-DEC-02: SDI is bits 8-9 and independent of altitude/SSM/validity."""
+    word = aim_ctypes.encode_word(aim_ctypes.LABEL_203, sdi,
+                                  aim_ctypes.AIM_SSM_NORMAL_OPERATION, 12345)
+    out = aim_ctypes.DecodedWord()
+    lib.aim_decoder_decode(word, aim_ctypes.ctypes.byref(out))
+    assert out.sdi == sdi
+    assert out.altitude_ft == 12345
+    assert out.valid == 1

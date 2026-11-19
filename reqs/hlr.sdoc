@@ -280,3 +280,49 @@ result based only on its inputs and prior state.
 RELATIONS:
 - TYPE: Parent
   VALUE: SYS-9
+
+[REQUIREMENT]
+UID: HLR-FRM-01
+TITLE: Frame validation
+STATEMENT: >>>
+aim_framer_push shall deliver a frame only when it begins with SYNC 0xAA, has
+a known TYPE (0x01-0x05), and satisfies (TYPE + payload bytes + CHECKSUM) mod
+256 == 0; the payload shall be decoded little-endian.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-10
+
+[REQUIREMENT]
+UID: HLR-FRM-02
+TITLE: Rejection of bad frames
+STATEMENT: >>>
+aim_framer_push shall not deliver a frame with a bad checksum or an unknown
+TYPE, and shall count each such rejection (saturating at 65535).
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-10
+
+[REQUIREMENT]
+UID: HLR-FRM-03
+TITLE: Resynchronisation
+STATEMENT: >>>
+After a rejected frame or bytes preceding a SYNC, aim_framer_push shall
+rescan so that a valid frame beginning inside the rejected span, or directly
+after leading garbage, is still delivered.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-10
+
+[REQUIREMENT]
+UID: HLR-FRM-04
+TITLE: Back-to-back frames
+STATEMENT: >>>
+aim_framer_push shall be ready for a new frame immediately after delivering
+one, so that consecutive frames with no gap are all delivered.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-10

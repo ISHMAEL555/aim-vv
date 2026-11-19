@@ -137,3 +137,79 @@ def test_reconciliation_prefers_ch1_then_ch2_then_unavailable(lib, st):
 
     out = update(lib, st, 200, word(valid=False), word(valid=False))
     assert out.altitude_available == 0
+
+
+def test_ch2_staleness_and_ch1_stale_failover(lib, st):
+    """HLR-MON-02 / HLR-MON-06: each channel goes stale independently, and a
+    stale ch1 fails over to a good ch2."""
+    update(lib, st, 0, word(), word(altitude_ft=11000))
+
+    out = update(lib, st, STALE_MS + 1, word(), word(valid=False))
+    assert out.ch2_stale == 1
+    assert out.ch1_stale == 0
+    assert out.reconciled_altitude_ft == 10000
+
+    # Now ch1 stops while ch2 is good again: ch1 stale, ch2 used.
+    st2 = ac.MonitorState()
+    lib.aim_monitor_init(ctypes.byref(st2))
+    update(lib, st2, 0, word(), word(altitude_ft=11000))
+    out = update(lib, st2, STALE_MS + 1, word(valid=False), word(altitude_ft=11000))
+    assert out.ch1_stale == 1
+    assert out.altitude_available == 1
+    assert out.reconciled_altitude_ft == 11000
+
+
+def test_both_stale_means_unavailable(lib, st):
+    """HLR-MON-06"""
+    update(lib, st, 0, word(), word())
+    out = update(lib, st, STALE_MS + 1, word(valid=False), word(valid=False))
+    assert out.altitude_available == 0
+
+
+def test_never_good_ch2_is_invalid_not_stale(lib, st):
+    """HLR-MON-02: a channel that was never good is invalid, not stale."""
+    out = update(lib, st, 10_000, word(), word(valid=False))
+    assert out.ch2_valid == 0
+    assert out.ch2_stale == 0
+    assert out.reconciled_altitude_ft == 10000
+
+
+def test_latched_miscompare_reconverge_timer_restarts(lib, st):
+    """HLR-MON-04: re-diverging mid-clear abandons the clear attempt, so the
+    full persistence time must elapse again from the next convergence."""
+    a = word(altitude_ft=10000)
+    bad = word(altitude_ft=10000 + THRESHOLD + 1)
+    good = word(altitude_ft=10000)
+
+    update(lib, st, 0, a, bad)
+    update(lib, st, PERSIST_MS, a, bad)           # latched
+    update(lib, st, PERSIST_MS + 100, a, good)    # converging starts
+    update(lib, st, PERSIST_MS + 200, a, bad)     # diverges again: reset
+    update(lib, st, PERSIST_MS + 300, a, good)    # converging restarts
+    out = update(lib, st, PERSIST_MS + 300 + PERSIST_MS - 1, a, good)
+    assert out.miscompare == 1
+    out = update(lib, st, PERSIST_MS + 300 + PERSIST_MS, a, good)
+    assert out.miscompare == 0
+
+
+def test_rediverge_after_clear_needs_full_persistence_again(lib, st):
+    """HLR-MON-03/04: after the latch has cleared, a fresh divergence must
+    again persist for the full time; stale divergence state from the earlier
+    episode must not cause an instant re-latch."""
+    a = word(altitude_ft=10000)
+    bad = word(altitude_ft=10000 + THRESHOLD + 1)
+    good = word(altitude_ft=10000)
+
+    update(lib, st, 0, a, bad)
+    update(lib, st, PERSIST_MS, a, bad)               # latched
+    update(lib, st, PERSIST_MS + 10, a, good)
+    out = update(lib, st, 2 * PERSIST_MS + 10, a, good)
+    assert out.miscompare == 0                        # cleared
+
+    t = 2 * PERSIST_MS + 20
+    out = update(lib, st, t, a, bad)                  # new divergence begins
+    assert out.miscompare == 0
+    out = update(lib, st, t + PERSIST_MS - 1, a, bad)
+    assert out.miscompare == 0
+    out = update(lib, st, t + PERSIST_MS, a, bad)
+    assert out.miscompare == 1

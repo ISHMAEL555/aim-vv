@@ -11,3 +11,8 @@ import aim_ctypes  # noqa: E402
 @pytest.fixture(scope="session")
 def lib():
     return aim_ctypes.load()
+
+
+@pytest.fixture(scope="session")
+def framer_lib():
+    return aim_ctypes.load_framer()
